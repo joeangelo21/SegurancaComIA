@@ -42,3 +42,18 @@ sudo python3 auditoria.py
 Esta é uma ferramenta de pesquisa em segurança da informação. O uso de iptables para bloquear IPs pode causar negação de serviço a si mesmo caso não seja configurado corretamente. Certifique-se de manter sua rede local na WHITELIST dentro do arquivo auditoria.py.
 
 Desenvolvido por Jose Joelson Angelo de Sousa Filho.
+
+Sentinela: Detector de Ameaças com IA
+Como funciona
+O Sentinela realiza a varredura contínua da rede em busca de atividade suspeita.
+
+Ao detectar um tráfego anômalo, o Sentinela extrai o IP e envia para análise minuciosa da IA Local.
+
+Se a IA confirmar a intenção maliciosa, o Sentinela executa a regra de bloqueio automaticamente.
+
+Requisitos
+Python 3.x
+
+Bibliotecas: (liste aqui as bibliotecas que você usa, ex: scapy, ollama, etc)
+
+Sistema: Privilégios de root (necessário para manipulação de pacotes e iptables)
