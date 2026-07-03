@@ -1,91 +1,151 @@
-SegurancaComIA (Motor Cognitivo)
-O SegurancaComIA é um ecossistema de defesa cibernética de alta performance, projetado para monitoramento, análise semântica de tráfego e resposta ativa a incidentes. Diferente de sistemas tradicionais, ele utiliza inteligência artificial local para classificar payloads em tempo real.
+# 🛡️ SegurancaComIA — AI-Driven Intrusion Detection System
 
-🏗️ Arquitetura de Defesa em Camadas
-O sistema opera através de dois módulos integrados:
+## 📌 Visão Geral
 
-Camada 1 (Sensor/Sentinela): Implementada em monitor_network.py. Realiza a captura bruta de pacotes via Scapy, filtragem de tráfego e geração de telemetria persistente.
+O **SegurancaComIA** é um sistema experimental de detecção de intrusão (IDS) que combina:
 
-Camada 2 (Cérebro/Motor Cognitivo): Implementada em auditoria.py. Consome os logs do Sentinela, analisa o contexto do payload através de modelos de IA (via Ollama) e executa bloqueios automáticos via iptables.
+- Captura de tráfego de rede em tempo real (Scapy)
+- Pipeline de eventos estruturados em JSON
+- Análise inteligente com IA local (Ollama + Qwen 2.5 Coder)
+- Sistema de feedback para bloqueio dinâmico de IPs
 
-🚀 Funcionalidades Principais
-Análise Semântica: Uso de LLMs (Qwen2.5) para identificar padrões de ataque que filtros de rede comuns ignorariam.
+O objetivo do projeto é simular um **SOC (Security Operations Center) local leve**, utilizando inteligência artificial para classificação de tráfego.
 
-Resposta Ativa (Active Defense): Integração direta com o netfilter (iptables) para banimento automático.
+---
 
-Performance: Arquitetura desacoplada que não bloqueia o fluxo de rede enquanto processa a inferência da IA.
+## 🧠 Arquitetura
 
-Dashboard em Tempo Real: Monitoramento visual de temperatura de GPU, volume de tráfego e mural de vereditos de segurança.
 
-🛠️ Como rodar o ecossistema
-Inicie o Sensor:
+Rede → Sentinela (Scapy) → Eventos JSON → IA Local (Ollama)
+↓
+Decisão (NORMAL / ATAQUE)
+↓
+Feedback Loop (banimento de IP)
 
-Bash
-sudo python3 monitor_network.py
-Inicie o Motor Cognitivo:
 
-Bash
-sudo python3 auditoria.py
-🛡️ Aviso Legal
-Este software é uma ferramenta experimental de defesa. O uso de automação de iptables requer privilégios de root e deve ser configurado cuidadosamente para evitar o bloqueio de serviços essenciais.
+---
 
-✒️ Autor
-Joelson Angelo - Ethical Hacker | Python Developer# Projeto_Seguran-a_Com_IA
-Projeto de Segurança e IPS com IA local
+## ⚙️ Componentes
 
-# Motor Cognitivo IPS
+### 🔹 1. Sentinela (sentinela.py)
 
-O **Motor Cognitivo IPS** é uma ferramenta de monitoramento de rede e prevenção de intrusão (IPS) que utiliza Inteligência Artificial Local para classificar tráfego e detectar anomalias em tempo real.
+Responsável por:
 
-## 🛠️ Tecnologias e Dependências
+- Capturar pacotes de rede em tempo real
+- Filtrar IPs (whitelist / blacklist)
+- Gerar eventos estruturados em JSON
+- Enviar eventos para buffer local (`/tmp/traffic_buffer`)
+- Manter histórico de volume de tráfego por IP
 
-Para rodar este projeto, você precisará do Python 3 instalado no sistema. As dependências necessárias são:
+---
 
-- `requests`: Para comunicação com a API local do Ollama.
-- `ollama`: (Opcional, se desejar controlar o modelo via Python).
-- `tkinter`: (Geralmente incluído no Python, para interfaces).
+### 🔹 2. IA Analyzer (auditoria.py)
 
-## 🚀 Como Instalar
+Responsável por:
 
-### 1. Clonar o Repositório
+- Ler eventos JSON do buffer
+- Enviar payload para modelo local via Ollama API
+- Classificar tráfego como:
+  - `NORMAL`
+  - `ATAQUE` (XSS, SQLi, Exploit, Flood, Scan)
+- Gerar decisão estruturada
+- Acionar bloqueio via feedback loop
+
+---
+
+## 🤖 Inteligência Artificial
+
+Modelo utilizado:
+
+- `qwen2.5-coder:3b` (via Ollama)
+
+Função da IA:
+
+- Análise semântica de tráfego
+- Classificação de padrões suspeitos
+- Geração de resposta estruturada
+
+---
+
+## 📂 Estrutura do Projeto
+
+
+.
+├── sentinela.py # Captura e geração de eventos de rede
+├── auditoria.py # IA que analisa os eventos
+├── README.md
+└── /tmp/traffic_buffer # Pipeline de eventos (runtime)
+
+
+---
+
+## 🚀 Como Executar
+
+### 1. Iniciar a IA local (Ollama)
+
 ```bash
-git clone git@github.com:joeangelo21/SegurancaComIA.git
-cd SegurancaComIA
-2. Instalar Bibliotecas
-Instale as dependências via pip:
+ollama run qwen2.5-coder:3b
+2. Rodar o Sentinela
+sudo python3 sentinela.py
+3. Rodar o analisador de IA
+python3 auditoria.py
+📡 Fluxo de Dados
+Pacotes de rede são capturados
+Convertidos em eventos JSON
+Salvos no buffer /tmp/traffic_buffer
+IA analisa cada evento
+Sistema classifica como NORMAL ou ATAQUE
+IPs suspeitos são adicionados ao feedback de bloqueio
+🔥 Exemplo de Evento
+{
+  "ip": "192.168.1.50",
+  "size": 512,
+  "summary": "IP / TCP packet",
+  "timestamp": 1720000000.123
+}
+🧪 Exemplo de Saída da IA
+{
+  "tipo": "ATAQUE",
+  "categoria": "SQLi",
+  "confianca": 0.92
+}
+🧠 Objetivo do Projeto
 
-Bash
-pip install requests
-3. Configuração do Modelo Local
-Este projeto depende do Ollama rodando na sua máquina.
+Este projeto simula um:
 
-Instale o Ollama em ollama.com.
+🔥 IDS híbrido com inteligência artificial local
 
-Puxe o modelo utilizado pelo script:
+Com foco em:
 
-Bash
-ollama run qwen2.5:3b
-🛡️ Como Executar
-O script monitora arquivos de log em tempo real e utiliza o iptables para bloqueios. Por isso, a execução requer privilégios de superusuário:
+aprendizado de segurança de rede
+detecção de intrusão
+integração com LLMs locais
+arquitetura de pipeline de eventos
+⚠️ Aviso
 
-Bash
-sudo python3 auditoria.py
-⚠️ Aviso de Segurança
-Esta é uma ferramenta de pesquisa em segurança da informação. O uso de iptables para bloquear IPs pode causar negação de serviço a si mesmo caso não seja configurado corretamente. Certifique-se de manter sua rede local na WHITELIST dentro do arquivo auditoria.py.
+Este projeto é experimental e deve ser utilizado apenas em ambientes controlados (laboratório / VM).
 
-Desenvolvido por Jose Joelson Angelo de Sousa Filho.
+👨‍💻 Autor
 
-Sentinela: Detector de Ameaças com IA
-Como funciona
-O Sentinela realiza a varredura contínua da rede em busca de atividade suspeita.
+Joelson Angelo
+Cybersecurity & Systems Development
 
-Ao detectar um tráfego anômalo, o Sentinela extrai o IP e envia para análise minuciosa da IA Local.
 
-Se a IA confirmar a intenção maliciosa, o Sentinela executa a regra de bloqueio automaticamente.
+---
 
-Requisitos
-Python 3.x
+# 🚀 Agora o próximo passo
 
-Bibliotecas: (liste aqui as bibliotecas que você usa, ex: scapy, ollama, etc)
+Depois de colar isso:
 
-Sistema: Privilégios de root (necessário para manipulação de pacotes e iptables)
+```bash
+git add README.md
+git commit -m "docs: update architecture and system pipeline description"
+git push
+💣 Resultado final
+
+Seu GitHub vai ficar com:
+
+projeto técnico explicado
+arquitetura clara
+fluxo visual
+stack moderna (IA + IDS + Linux)
