@@ -3,31 +3,26 @@ import time
 import json
 import requests
 
-BUFFER_DIR = "/tmp/traffic_buffer"
+BUFFER = "/tmp/traffic_buffer"
 MODEL = "qwen2.5-coder:3b"
 
 # =========================
-# IA ANALYSIS
+# IA
 # =========================
 
-def analisar(evento):
+def analisar(event):
     prompt = f"""
-Você é um sistema de segurança de rede.
+Classifique o tráfego:
 
-Classifique o tráfego como:
-- NORMAL
-- ATAQUE (SQLi, XSS, Scan, Exploit, Flood)
-
-Responda APENAS em JSON:
-
+Responda JSON:
 {{
   "tipo": "NORMAL ou ATAQUE",
-  "categoria": "tipo de ataque ou none",
-  "confianca": 0.0 a 1.0
+  "categoria": "tipo",
+  "confianca": 0-1
 }}
 
 Evento:
-{json.dumps(evento, indent=2)}
+{json.dumps(event)}
 """
 
     try:
@@ -46,36 +41,30 @@ Evento:
         try:
             return json.loads(resp)
         except:
-            return {"tipo": "ERRO_IA", "raw": resp}
+            return {"tipo": "ERRO", "raw": resp}
 
     except Exception as e:
-        return {"tipo": "ERRO_IA", "error": str(e)}
-
+        return {"tipo": "ERRO", "error": str(e)}
 
 # =========================
-# PROCESSADOR
+# PROCESS
 # =========================
 
-def processar(path):
+def process(path):
     try:
-        with open(path, "r") as f:
-            evento = json.load(f)
+        with open(path) as f:
+            event = json.load(f)
 
-        resultado = analisar(evento)
+        result = analisar(event)
 
-        print(f"\n[IA] {evento['ip']} -> {resultado}")
+        print("\n[IA]", event["ip"], "->", result)
 
-        # decisão de bloqueio
-        if resultado.get("tipo") == "ATAQUE":
-            ip = evento["ip"]
-
+        if result.get("tipo") == "ATAQUE":
             with open("feedback_ban.log", "a") as f:
-                f.write(ip + "\n")
-
-            print(f"[!] BLOQUEIO ENVIADO: {ip}")
+                f.write(event["ip"] + "\n")
 
     except Exception as e:
-        print(f"[ERRO] {e}")
+        print("[ERRO]", e)
 
     finally:
         try:
@@ -83,34 +72,28 @@ def processar(path):
         except:
             pass
 
-
 # =========================
 # LOOP
 # =========================
 
-def monitorar():
-    os.makedirs(BUFFER_DIR, exist_ok=True)
+def run():
+    os.makedirs(BUFFER, exist_ok=True)
 
-    print("[*] IA Analyzer rodando...")
+    print("[*] IA rodando...")
 
-    vistos = set()
+    seen = set()
 
     while True:
-        try:
-            for file in os.listdir(BUFFER_DIR):
-                path = os.path.join(BUFFER_DIR, file)
+        for file in os.listdir(BUFFER):
+            path = os.path.join(BUFFER, file)
 
-                if path in vistos:
-                    continue
+            if path in seen:
+                continue
 
-                processar(path)
-                vistos.add(path)
-
-        except Exception as e:
-            print(f"[LOOP ERROR] {e}")
+            process(path)
+            seen.add(path)
 
         time.sleep(1)
 
-
 if __name__ == "__main__":
-    monitorar()
+    run()
