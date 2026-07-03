@@ -1,83 +1,84 @@
 import os
-import re
 import time
 import requests
-import subprocess
-from collections import defaultdict, deque
 
-# Configurações
-LOG_FILE = "monitoramento_rede.log"
-FEEDBACK_FILE = "feedback_ban.log"
-MODELO = "qwen2.5:3b"
-PALAVRAS_SUSPEITAS = ["select", "union", "script", "etc/passwd", "drop", "alert"]
+WATCH_DIR = "/tmp/traffic_buffer"
+MODELO = "qwen2.5-coder:3b"
 
-# Memória
-historico_por_ip = defaultdict(lambda: deque(maxlen=6))
-IP_VOLUME_HISTORY = defaultdict(int)
-ultimos_vereditos = []
-ULTIMA_RENDERIZACAO = 0
+def analisar_trafego(payload):
+    prompt = (
+        "Você é um motor de inspeção de tráfego de rede. "
+        "Classifique o payload como ATAQUE (XSS, SQLi, Exploit) ou NORMAL. "
+        "Responda apenas 'ATAQUE: tipo' ou 'NORMAL'.\n\n"
+        f"Payload:\n{payload}"
+    )
 
-def get_gpu_temp():
     try:
-        return subprocess.check_output(["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader"]).decode("utf-8").strip()
-    except: return "N/A"
+        r = requests.post(
+            "http://localhost:11434/api/generate",
+            json={
+                "model": MODELO,
+                "stream": False,
+                "prompt": prompt
+            },
+            timeout=10
+        )
 
-def bloquear_ip(ip):
+        data = r.json()
+        return data.get("response", "NORMAL")
+
+    except Exception as e:
+        print(f"[ERRO IA] {e}")
+        return "ERRO_IA"
+
+
+def processar_arquivo(caminho):
     try:
-        subprocess.run(["sudo", "iptables", "-I", "INPUT", "-s", ip, "-j", "DROP"], check=True)
-        with open(FEEDBACK_FILE, "a") as f: f.write(f"{ip}\n")
-    except: pass
+        with open(caminho, "r", encoding="utf-8", errors="ignore") as f:
+            payload = f.read().strip()
 
-def renderizar_dashboard(ip_recent, status):
-    global ULTIMA_RENDERIZACAO
-    if (time.time() - ULTIMA_RENDERIZACAO) < 0.5: return
-    ULTIMA_RENDERIZACAO = time.time()
-    
-    os.system('clear')
-    print(f"=== MOTOR COGNITIVO IPS [CÉREBRO ATIVO] | MODELO: {MODELO} ===")
-    print(f"🌡 GPU: {get_gpu_temp()}°C | MONITORANDO LOGS...")
-    print("-" * 77)
-    print(f"Último IP processado: {ip_recent} | Status: {status}")
-    print("\n📜 MURAL DE VEREDITOS (IA):")
-    if ultimos_vereditos: print("\n".join(reversed(ultimos_vereditos)))
+        if not payload:
+            return
 
-def analisar_com_ia(linha, ip):
-    payload_match = re.search(r'PAYLOAD: (.*?) \| TIME:', linha)
-    conteudo = payload_match.group(1).lower() if payload_match else linha.lower()
+        veredito = analisar_trafego(payload)
+        nome = os.path.basename(caminho)
 
-    if not any(x in conteudo for x in PALAVRAS_SUSPEITAS): return "NORMAL"
+        print(f"[*] {nome} -> {veredito}")
 
-    historico_por_ip[ip].append(conteudo)
-    try:
-        response = requests.post("http://localhost:11434/api/generate", json={
-            "model": MODELO, "stream": False, "prompt": f"Analise: {conteudo}. Responda APENAS: ATAQUE ou NORMAL."
-        }, timeout=5)
-        return response.json().get('response', 'NORMAL').strip().upper()
-    except: return "NORMAL"
+        if "ATAQUE" in veredito:
+            print(f"[!] ALERTA: possível ataque detectado em {nome}")
 
-def processar():
-    print(f"[*] Cérebro Cognitivo online. Aguardando fatos do Sentinela...")
-    with open(LOG_FILE, 'r') as f:
-        f.seek(0, 2)
-        while True:
-            linha = f.readline()
-            if not linha:
-                time.sleep(0.1)
-                continue
-            
-            ip_match = re.search(r'SRC: (\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)', linha)
-            if ip_match:
-                ip = ip_match.group(1)
-                classificacao = analisar_com_ia(linha, ip)
-                
-                msg = f"[{time.strftime('%H:%M:%S')}] {classificacao}: {ip}"
-                ultimos_vereditos.append(msg)
-                if len(ultimos_vereditos) > 8: ultimos_vereditos.pop(0)
+    finally:
+        # só remove depois de tentar processar
+        if os.path.exists(caminho):
+            os.remove(caminho)
 
-                if classificacao == "ATAQUE":
-                    bloquear_ip(ip)
-                
-                renderizar_dashboard(ip, classificacao)
+
+def monitorar():
+    os.makedirs(WATCH_DIR, exist_ok=True)
+
+    print(f"[*] Sentinela ativo em {WATCH_DIR}")
+
+    vistos = set()
+
+    while True:
+        try:
+            arquivos = os.listdir(WATCH_DIR)
+
+            for arq in arquivos:
+                caminho = os.path.join(WATCH_DIR, arq)
+
+                if caminho in vistos:
+                    continue
+
+                processar_arquivo(caminho)
+                vistos.add(caminho)
+
+        except Exception as e:
+            print(f"[ERRO LOOP] {e}")
+
+        time.sleep(1)
+
 
 if __name__ == "__main__":
-    processar()
+    monitorar()
