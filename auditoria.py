@@ -7,18 +7,22 @@ BUFFER = "/tmp/traffic_buffer"
 MODEL = "qwen2.5-coder:3b"
 
 # =========================
-# IA
+# IA ENGINE
 # =========================
 
 def analisar(event):
     prompt = f"""
-Classifique o tráfego:
+Você é um sistema SOC.
 
-Responda JSON:
+Classifique o evento:
+
+Responda APENAS JSON:
+
 {{
   "tipo": "NORMAL ou ATAQUE",
-  "categoria": "tipo",
-  "confianca": 0-1
+  "categoria": "tipo de ataque",
+  "confianca": 0.0-1.0,
+  "risco": 0.0-1.0
 }}
 
 Evento:
@@ -36,12 +40,15 @@ Evento:
             timeout=15
         )
 
-        resp = r.json().get("response", "")
+        raw = r.json().get("response", "")
 
         try:
-            return json.loads(resp)
+            return json.loads(raw)
         except:
-            return {"tipo": "ERRO", "raw": resp}
+            return {
+                "tipo": "ERRO",
+                "raw": raw
+            }
 
     except Exception as e:
         return {"tipo": "ERRO", "error": str(e)}
@@ -57,11 +64,14 @@ def process(path):
 
         result = analisar(event)
 
-        print("\n[IA]", event["ip"], "->", result)
+        print("\n[IA]", event["ip"], "=>", result)
 
-        if result.get("tipo") == "ATAQUE":
+        # decisão de bloqueio
+        if result.get("tipo") == "ATAQUE" or result.get("risco", 0) > 0.7:
             with open("feedback_ban.log", "a") as f:
                 f.write(event["ip"] + "\n")
+
+            print("[!] BAN ENVIADO:", event["ip"])
 
     except Exception as e:
         print("[ERRO]", e)
@@ -79,7 +89,7 @@ def process(path):
 def run():
     os.makedirs(BUFFER, exist_ok=True)
 
-    print("[*] IA rodando...")
+    print("[*] IA V2 rodando...")
 
     seen = set()
 
