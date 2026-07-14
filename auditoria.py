@@ -3,17 +3,26 @@ import re
 import time
 import requests
 import subprocess
-from collections import defaultdict, deque
+import json
+from collections import defaultdict
 
+<<<<<<< HEAD
 # ==============================================================================
 # CONFIGURAÇÕES E MEMÓRIA
 # ==============================================================================
 LOG_FILE = "/home/kali/pentest_lab/monitoramento_rede.log"
+=======
+# CONFIGURAÇÕES
+LOG_FILE = "/home/kali/pentest_lab/monitoramento_rede.log"
+SCORE_FILE = "/home/kali/pentest_lab/risks.json"
+WHITELIST = ["192.168.1.5", "192.168.1.86"]
+>>>>>>> 4877218 (Commit da Sentinela: versão melhorada de monitoramento e defesa)
 MODELO = "qwen2.5-coder:3b"
 URL_OLLAMA = "http://localhost:11434/api/generate"
 SCORE_THRESHOLD = 3
 PALAVRAS_SUSPEITAS = ["select", "union", "or 1=1", "script", "etc/passwd", "alert", "drop"]
 
+<<<<<<< HEAD
 historico_por_ip = defaultdict(lambda: deque(maxlen=6))
 risk_score = defaultdict(int)
 IP_VOLUME_HISTORY = defaultdict(int)
@@ -69,6 +78,35 @@ def renderizar_dashboard():
 # ==============================================================================
 # LOOP PRINCIPAL
 # ==============================================================================
+=======
+# CARREGAR RISCOS
+if os.path.exists(SCORE_FILE):
+    with open(SCORE_FILE, "r") as f: risk_score = defaultdict(int, json.load(f))
+else: risk_score = defaultdict(int)
+
+def salvar_riscos():
+    with open(SCORE_FILE, "w") as f: json.dump(risk_score, f)
+
+def banir_ip(ip):
+    if ip in WHITELIST:
+        print(f"[!] Tentativa de banir IP da Whitelist: {ip}. Ignorado.")
+        return
+    print(f"\n[!!!] BANINDO IP HOSTIL: {ip}")
+    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"])
+
+def analisar_com_ia(linha, ip):
+    # Filtro rápido
+    if not any(x in linha.lower() for x in PALAVRAS_SUSPEITAS): return "NORMAL"
+    
+    try:
+        response = requests.post(URL_OLLAMA, json={
+            "model": MODELO, "stream": False,
+            "prompt": f"Analise este payload: {linha}. Responda APENAS: ATAQUE_CRITICO, ATAQUE_FLOOD ou NORMAL."
+        }, timeout=30)
+        return response.json().get('response', 'NORMAL').strip().upper()
+    except: return "NORMAL"
+
+>>>>>>> 4877218 (Commit da Sentinela: versão melhorada de monitoramento e defesa)
 def monitorar_fila():
     if not os.path.exists(LOG_FILE): open(LOG_FILE, 'a').close()
     with open(LOG_FILE, 'r') as f:
@@ -83,6 +121,7 @@ def monitorar_fila():
             ip_match = re.search(r'SRC: (\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b)', linha)
             if ip_match:
                 ip = ip_match.group(1)
+<<<<<<< HEAD
                 size_match = re.search(r'SIZE: (\d+)B', linha)
                 IP_VOLUME_HISTORY[ip] += int(size_match.group(1)) if size_match else 0
                 
@@ -104,3 +143,22 @@ if __name__ == "__main__":
         monitorar_fila()
     else:
         print("Erro: Ollama não respondeu ao aquecimento. Verifique o serviço.")
+=======
+                
+                # Ignora whitelist no processamento
+                if ip in WHITELIST: continue
+                
+                status = analisar_com_ia(linha, ip)
+                if status == "ATAQUE_CRITICO":
+                    risk_score[ip] = SCORE_THRESHOLD
+                    banir_ip(ip)
+                elif status == "ATAQUE_FLOOD":
+                    risk_score[ip] += 1
+                    if risk_score[ip] >= SCORE_THRESHOLD: banir_ip(ip)
+                
+                salvar_riscos()
+
+if __name__ == "__main__":
+    print("[*] Auditoria7 - Motor Cognitivo Rodando...")
+    monitorar_fila()
+>>>>>>> 4877218 (Commit da Sentinela: versão melhorada de monitoramento e defesa)
