@@ -12,7 +12,8 @@ from collections import defaultdict, deque
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(BASE_DIR, "monitoramento_rede.log")
 SCORE_FILE = os.path.join(BASE_DIR, "risks.json")
-WHITELIST = ["192.168.1.5", "192.168.1.86"]
+# Adicionado 192.168.1.254 aqui também
+WHITELIST = ["192.168.1.5", "192.168.1.86", "192.168.1.254"]
 MODELO = "qwen2.5-coder:3b"
 URL_OLLAMA = "http://localhost:11434/api/generate"
 SCORE_THRESHOLD = 3
@@ -76,8 +77,16 @@ def banir_ip(ip):
     if ip in WHITELIST:
         print(f"[!] Tentativa de banir IP da Whitelist: {ip}. Ignorado.")
         return
-    ultimos_vereditos.append(f"⛔ BANIDO: {ip}")
-    subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"])
+    
+    # AJUSTE: Verifica se a regra já existe no iptables antes de adicionar
+    check = subprocess.run(["sudo", "iptables", "-C", "INPUT", "-s", ip, "-j", "DROP"], 
+                           capture_output=True, text=True)
+    if check.returncode != 0:
+        ultimos_vereditos.append(f"⛔ BANIDO: {ip}")
+        subprocess.run(["sudo", "iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"])
+    else:
+        # Se check.returncode == 0, a regra já existe, não faz nada
+        pass
 
 def analisar_com_ia(linha, ip):
     payload_match = re.search(r'PAYLOAD: (.*?) \|', linha)

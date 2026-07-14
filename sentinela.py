@@ -4,7 +4,8 @@ from scapy.all import sniff, IP, TCP
 # Caminho deve coincidir com o LOG_FILE do auditoria7.py (mesma pasta)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(BASE_DIR, "monitoramento_rede.log")
-WHITELIST = ["192.168.1.5", "192.168.1.86"]
+# Adicionado 192.168.1.254 à whitelist para evitar monitoramento do gateway
+WHITELIST = ["192.168.1.5", "192.168.1.86", "192.168.1.254"]
 
 def log_para_auditoria(ip, size, payload):
     if ip in WHITELIST:
